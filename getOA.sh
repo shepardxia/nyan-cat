@@ -1,0 +1,1 @@
+curl -v -X POST "https://api.artsy.net/api/tokens/xapp_token?client_id=a092e150d2731f2ffef4&client_secret=8e2986a236cdf6a8e78ac3a36af26cc9"
