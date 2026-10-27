@@ -9,7 +9,6 @@ const HEIGHT = 84;
 const SPEED = 150; // px per second
 const BLOWUP_MS = 2300; // how long the explosion plays before the cat respawns
 const BLOWUP_PER_SECOND = 0.05; // chance per second of walking that the cat blows up
-const WANDER = 200; // how far the cat drifts vertically when it turns
 
 // Five steps a second, each one smoothed into the next by the CSS transition
 // below. The compositor interpolates the pixels for free; stepping at frame
@@ -26,54 +25,37 @@ const stage = () => ({
   height: Math.max(0, window.innerHeight - HEIGHT),
 });
 
-export const initialState = {
-  x: -WIDTH,
-  y: Math.random() * (window.innerHeight - HEIGHT),
-  facing: 'r',
-  teleportFor: 0,
-  jumped: true,
-};
+// The cat enters just off the edge behind it, at a random height.
+const enter = (facing, {width, height}) => ({
+  x: facing === 'r' ? -WIDTH : width,
+  y: Math.random() * height,
+  facing,
+  blowupFor: 0,
+  jumped: true, // entering is a cut, not a walk
+});
 
-// Never returns undefined: a cat that stops wandering is a cat that has
+export const initialState = enter('r', stage());
+
+// Never returns undefined: a cat that stops walking is a cat that has
 // stopped, and the shared loop is meant to stay awake for it.
 export const animate = (state, dtMs) => {
-  const {width, height} = stage();
+  const screen = stage();
 
-  // Blowing up: the explosion plays where the cat stood, then it respawns
-  // at a random edge and walks in.
-  if (state.teleportFor > 0) {
-    const teleportFor = state.teleportFor - dtMs;
-    if (teleportFor > 0) return {...state, teleportFor};
-
-    const facing = Math.random() > 0.5 ? 'r' : 'l';
-    return {
-      x: facing === 'r' ? -WIDTH : width,
-      y: Math.random() * height,
-      facing,
-      teleportFor: 0,
-      jumped: true, // reappearing is a cut, not a walk
-    };
+  // The explosion plays where the cat stood, then it respawns at a random edge.
+  if (state.blowupFor > 0) {
+    const blowupFor = state.blowupFor - dtMs;
+    return blowupFor > 0 ? {...state, blowupFor} : enter(Math.random() < 0.5 ? 'r' : 'l', screen);
   }
 
   if (Math.random() < (BLOWUP_PER_SECOND * dtMs) / 1000) {
-    return {...state, teleportFor: BLOWUP_MS, jumped: true};
+    return {...state, blowupFor: BLOWUP_MS, jumped: true};
   }
 
-  const x = state.facing === 'r'
-    ? state.x + (SPEED * dtMs) / 1000
-    : state.x - (SPEED * dtMs) / 1000;
+  const step = (SPEED * dtMs) / 1000;
+  const x = state.facing === 'r' ? state.x + step : state.x - step;
 
-  if (x > width || x < -WIDTH) {
-    const goingRight = x < 0;
-    return {
-      ...state,
-      x: goingRight ? -WIDTH : width,
-      facing: goingRight ? 'r' : 'l',
-      y: Math.min(height, Math.max(0, state.y + (Math.random() - 0.5) * WANDER)),
-      jumped: false,
-    };
-  }
-
+  // Off an edge: back in from that same edge, facing the other way.
+  if (x > screen.width || x < -WIDTH) return enter(state.facing === 'r' ? 'l' : 'r', screen);
   return {...state, x, jumped: false};
 };
 
@@ -85,9 +67,9 @@ export const className = `
   pointer-events: none;
 `;
 
-export const render = ({x, y, facing, teleportFor, jumped}) => (
+export const render = ({x, y, facing, blowupFor, jumped}) => (
   <img
-    src={sprite(teleportFor > 0 ? 'catter.gif' : facing === 'l' ? 'catt.gif' : 'ca.gif')}
+    src={sprite(blowupFor > 0 ? 'catter.gif' : facing === 'l' ? 'catt.gif' : 'ca.gif')}
     width={WIDTH}
     height={HEIGHT}
     style={{
